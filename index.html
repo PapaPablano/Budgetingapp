@@ -227,10 +227,16 @@
 
     function renderSummary() {
       const summary = state.summary;
-      const awaitingIncome = !summary || summary.status === 'awaiting';
+      // Treat a missing/malformed summary the same as "awaiting" rather than formatting
+      // undefined figures -- guards against a legacy or corrupted budget-v1 value, not just
+      // the genuine awaiting-income case.
+      const hasFigures = summary && summary.status !== 'awaiting'
+        && typeof summary.totalIncome === 'number' && typeof summary.remaining === 'number';
+      const awaitingIncome = !hasFigures;
+      const totalBills = summary && typeof summary.totalBills === 'number' ? summary.totalBills : 0;
 
       totalIncomeEl.textContent = awaitingIncome ? 'Awaiting income' : currency.format(summary.totalIncome);
-      totalBillsEl.textContent = currency.format(summary ? summary.totalBills : 0);
+      totalBillsEl.textContent = currency.format(totalBills);
       remainingEl.textContent = awaitingIncome ? 'Awaiting income' : currency.format(summary.remaining);
 
       incomeCard.classList.toggle('awaiting', awaitingIncome);
