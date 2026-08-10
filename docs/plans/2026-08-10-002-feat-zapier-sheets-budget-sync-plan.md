@@ -44,8 +44,10 @@ Both pages are fully static HTML/CSS/JS with no backend; all data lives in `loca
 
 Inspected live against the connected Zapier MCP server's action schemas (not general documentation) during planning — this confirms the action and its parameters exist, not that an overwrite call has actually been executed against a real sheet yet (that's still gated on the OAuth step below, and is the first real-world test of this mechanism):
 - Google Sheets is available via Zapier MCP (`GoogleSheetsV2CLIAPI`) and was enabled during this planning session (29 actions: 8 read, 21 write, including `create_spreadsheet`). The connection requires a one-time Google OAuth step (`needs_auth: true`) not yet completed — see Dependencies below.
-- `create_worksheet` accepts `overwrite: true` plus a `headers` list and (re)creates a worksheet with that exact title, replacing any prior contents in one call. This is a genuine bulk-replace primitive — it resolves the review-flagged risk that Sheets actions are "row-based only" and removes the need for a fragile clear-then-write-N-rows sequence. Its actual replace behavior against a real sheet (e.g. one with unusual formatting or protected ranges) is still unconfirmed until Unit 3 first runs for real — see Risks.
-- `add_row` / `add_row_lines` write one or more rows; `get_data_range` / `find_many_rows` read a tab back for verification.
+- `create_worksheet` accepts `overwrite: true` plus a `headers` list and (re)creates a worksheet with that exact title, replacing any prior contents in one call. This is a genuine bulk-replace primitive — it resolves the review-flagged risk that Sheets actions are "row-based only" and removes the need for a fragile clear-then-write-N-rows sequence.
+- **Confirmed by an actual live test run against a real spreadsheet (2026-08-10), not just schema inspection**: `create_worksheet(overwrite: true)` genuinely replaces a tab's contents in place (same `sheetId`/tab preserved, prior rows gone) — this validates R5's core mechanism end-to-end, including a second overwrite immediately after the first.
+- **`add_row` and `get_data_range` proved unreliable in that same live test**: called immediately after `create_worksheet`, `add_row` (with the new headers passed as `dynamic_properties`) returned an empty result and wrote nothing, and `get_data_range` read back an empty range even after data was confirmed present via the raw API — most likely because Zapier's dynamic-field/read cache hadn't picked up the freshly (re)created worksheet yet. **Superseded by the raw Sheets API** (see next point) rather than chasing a workaround for a lag with no documented bound.
+- **Raw Sheets API via the already-enabled `_zap_raw_request` action is the reliable path for both writing and reading**: a single `POST .../values/'<tab>'!A1:append` call (with `valueInputOption=RAW`, `insertDataOption=INSERT_ROWS`) wrote all of a page's records in one atomic call and was immediately readable via `GET .../values/'<tab>'!A1:D<n>` — both succeeded on the first try in live testing, unlike `add_row`/`get_data_range`. This becomes Unit 3's actual write and read-back mechanism instead of `add_row`/`add_row_lines`/`get_data_range`/`find_many_rows`.
 
 ## Key Technical Decisions
 
@@ -69,15 +71,15 @@ Inspected live against the connected Zapier MCP server's action schemas (not gen
 - Sheet/tab column mapping: uniform `record_type | record_id | synced_at | fields_json` schema across both pages, including explicit handling of non-array top-level fields like `paydays` (see High-Level Technical Design).
 - Export JSON shape and filename convention: versioned envelope, fixed base filenames located by pattern + newest-modified-time rather than exact match (see Key Technical Decisions — revised after review found exact-match unsafe against default browser download behavior).
 - Empty/bad-export safeguard and post-sync verification: both resolved as lightweight agent-side steps (see Key Technical Decisions) rather than app code, since the sync itself is agent-driven.
+- Row write/read mechanism: **confirmed by a live end-to-end test run** (2026-08-10, against a real spreadsheet) that `create_worksheet(overwrite: true)` + raw Sheets API `values.append`/`values.get` via `_zap_raw_request` is reliable, while `add_row`/`get_data_range` are not (see External References) — this is no longer a planning-time assumption.
 - Cross-session destination-spreadsheet identity: resolved by never silently reusing one — the agent states and confirms the destination every sync instead (see Key Technical Decisions). This removed the need for any persistence mechanism, which document review found undefined in the original draft.
 - `create_spreadsheet` availability: confirmed enabled among the 29 Zapier Sheets actions added during planning (see External References).
 
 ### Deferred to Implementation
 
-- Whether `add_row_lines` accepts a batch of multiple rows in one call, or whether each record needs its own `add_row` call — the action's dynamic parameter schema wasn't fully resolved during planning; check `dynamic_properties_schema` against `inspect_zapier_actions` when first executing a real sync, and prefer the batch form if available.
 - Exact default browser download location varies by OS/browser configuration — if the agent can't find a matching file in the common default location at sync time, it should ask the user for the path rather than guessing.
 - Precise Google OAuth scope granted by the Zapier Google Sheets connection is determined by Zapier's own consent screen at auth time, not something this plan configures directly.
-- Whether `create_worksheet(overwrite: true)` behaves as a clean full replace against a real spreadsheet with any unusual formatting/protection — first confirmed at the first live sync, verified via the Unit 3 step 6 read-back rather than assumed.
+- Whether the `add_row`/`get_data_range` unreliability observed in live testing was specific to a just-created worksheet (a propagation-lag theory) or a broader pattern — not re-investigated further since the raw-API path resolves it either way; worth a quick sanity check if a future sync ever needs to fall back to the higher-level actions.
 
 ## High-Level Technical Design
 
@@ -98,7 +100,7 @@ Every page produces exactly one `meta`-or-`paydays` row; there is no ambiguity a
 
 ## Implementation Units
 
-- [ ] **Unit 1: Export button on `index.html`**
+- [x] **Unit 1: Export button on `index.html`**
 
 **Goal:** Let the user download the current `index.html` state as a JSON file.
 
@@ -125,7 +127,7 @@ Every page produces exactly one `meta`-or-`paydays` row; there is no ambiguity a
 **Verification:**
 - Clicking the button downloads a correctly-named, valid JSON file whose `data` matches what's currently rendered on the page, in a real browser.
 
-- [ ] **Unit 2: Export button on `allocator.html`**
+- [x] **Unit 2: Export button on `allocator.html`**
 
 **Goal:** Let the user download the current `allocator.html` state as a JSON file.
 
@@ -152,7 +154,7 @@ Every page produces exactly one `meta`-or-`paydays` row; there is no ambiguity a
 **Verification:**
 - Clicking the button downloads a correctly-named, valid JSON file whose `data` matches the page's current state, in a real browser.
 
-- [ ] **Unit 3: Zapier → Google Sheets sync procedure (agent-driven, no app code)**
+- [x] **Unit 3: Zapier → Google Sheets sync procedure (agent-driven, no app code)**
 
 **Goal:** Define exactly how Claude performs a sync when the user asks, so it's repeatable and consistent across sessions rather than improvised each time.
 
@@ -167,8 +169,8 @@ Every page produces exactly one `meta`-or-`paydays` row; there is no ambiguity a
 2. Parse the envelope for each file; if every top-level entity collection is empty, confirm with the user before proceeding rather than silently overwriting a prior good sync.
 3. State the destination spreadsheet (name and URL) — a spreadsheet the user names, one already established earlier in the conversation, or a newly created one via `create_spreadsheet` — and get explicit confirmation before proceeding. Never silently reuse a spreadsheet from a prior session without the user confirming it in this one.
 4. For each page's data, call `create_worksheet` with `overwrite: true`, the page's tab title ("Cash Flow Planner" / "Paycheck Allocator"), and `headers: ["record_type", "record_id", "synced_at", "fields_json"]` — this replaces the tab's prior contents in one call.
-5. Write one row per record (batched via `add_row_lines` if it supports multiple rows in one call, otherwise sequential `add_row` calls) using the schema in High-Level Technical Design.
-6. Read the tab back (`get_data_range` or `find_many_rows`) and compare the row count to the number of records written; report success with the row count, or report a discrepancy rather than assuming success.
+5. Write all records for that tab in a single `_zap_raw_request` call: `POST /v4/spreadsheets/{id}/values/'<tab title>'!A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS` with a `values` array of rows, using the schema in High-Level Technical Design. (Confirmed reliable in live testing; `add_row`/`add_row_lines` are not used — see External References.)
+6. Read the tab back via `_zap_raw_request` `GET /v4/spreadsheets/{id}/values/'<tab title>'!A1:D<expected row count + 1>` and compare the row count to the number of records written; report success with the row count, or report a discrepancy rather than assuming success. (`get_data_range`/`find_many_rows` are not used — see External References.)
 
 **Test scenarios:**
 - Happy path: export both pages with representative data, ask Claude to sync → both tabs are (re)created with one row per record, read-back row count matches, success reported with counts.
@@ -185,7 +187,8 @@ Every page produces exactly one `meta`-or-`paydays` row; there is no ambiguity a
 
 | Risk | Mitigation |
 |------|------------|
-| `create_worksheet(overwrite: true)` may not behave as a clean full replace in every edge case (e.g. unusual sheet protections) — its schema was inspected during planning but not yet exercised against a real sheet | Unit 3 step 6 reads the tab back and reports a discrepancy instead of assuming success; first real sync is the first behavioral test of this mechanism |
+| ~~`create_worksheet(overwrite: true)` may not behave as a clean full replace in every edge case~~ Confirmed working (2026-08-10) via live test, including a second consecutive overwrite | Unit 3 step 6 still reads the tab back every sync and reports a discrepancy rather than assuming success, as an ongoing safeguard — not because the mechanism itself remains in doubt |
+| `add_row` and `get_data_range` were unreliable immediately after `create_worksheet` in live testing (silently wrote/read nothing) | Superseded: Unit 3 uses raw Sheets API calls via `_zap_raw_request` for both write and read-back instead (see External References, Key Technical Decisions) |
 | ~~Google OAuth for the Zapier Sheets connection isn't completed yet~~ Done (2026-08-10) | Connected as `epeterson0076@gmail.com`, set as default — see Dependencies/Prerequisites |
 | Downloaded file may not land where Claude Code expects it (browser/OS-dependent download folder), and browsers auto-suffix repeat downloads of the same name rather than overwriting | Pattern + newest-modified-time lookup (Unit 3 step 1) handles auto-suffixed duplicates; falls back to asking the user for the path if nothing matches |
 | No cross-session mechanism remembers which spreadsheet was used previously | Accepted by design: the agent always states and confirms the destination spreadsheet with the user each sync (Unit 3 step 3) instead of trying to persist that identity — also closes the "wrong-target destructive overwrite" gap the security review raised |
@@ -198,6 +201,10 @@ Every page produces exactly one `meta`-or-`paydays` row; there is no ambiguity a
 ## Dependencies / Prerequisites
 
 - ~~The Zapier MCP Google Sheets connection (`GoogleSheetsV2CLIAPI`) was enabled during planning but still requires a one-time Google account OAuth step before Unit 3 can be exercised for real.~~ **Done (2026-08-10):** connected as `epeterson0076@gmail.com` and set as the default connection. Unit 3 can now be exercised for real; the `create_worksheet(overwrite: true)` behavioral confirmation noted in Risks & Dependencies is unblocked.
+
+## Verification Log
+
+- **2026-08-10:** Ran Unit 3's mechanism end-to-end against a real, newly-created spreadsheet ("Budgeting App Sync (test)", https://docs.google.com/spreadsheets/d/1KKnnJUZzcb_yI8AbJXTGKXYHuPxNTLWX6Bga_uW_U0k/edit) using the actual JSON files produced by the Unit 1/2 browser verification. Both tabs were created, populated, and re-verified via `create_worksheet(overwrite: true)` + raw-API append/read, including re-running the overwrite once to confirm prior rows are cleared. This is a throwaway test sheet with placeholder data ("Test Paycheck", "Test Rent", "New goal") — not the user's real budget data, and not the sheet a real sync would target going forward (per the "confirm destination every sync" decision, the user will be asked which sheet to use next time).
 
 ## Sources & References
 
