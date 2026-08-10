@@ -255,7 +255,11 @@
     <header>
       <h1>Monthly Cash Flow Planner</h1>
       <p id="month-context"></p>
-      <p><a href="allocator.html" style="font-size: 0.85rem; color: var(--text-muted);">Paycheck Allocator &rarr;</a></p>
+      <p>
+        <a href="allocator.html" style="font-size: 0.85rem; color: var(--text-muted);">Paycheck Allocator &rarr;</a>
+        &middot;
+        <button type="button" id="export-btn" style="font: inherit; font-size: 0.85rem; color: var(--text-muted); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline;">Export data</button>
+      </p>
     </header>
 
     <div class="summary">
@@ -522,6 +526,26 @@
         labelInput.focus();
       }
     });
+
+    function exportData() {
+      const envelope = {
+        exportedAt: new Date().toISOString(),
+        source: 'index.html',
+        version: 1,
+        data: state
+      };
+      const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'cashflow-planner-export.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('export-btn').addEventListener('click', exportData);
 
     render();
   </script>

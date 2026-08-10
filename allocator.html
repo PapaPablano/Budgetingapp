@@ -333,6 +333,7 @@
         <button class="nav-btn" id="next-month" aria-label="Next month">&rsaquo;</button>
       </div>
       <a class="page-link" href="index.html">&larr; Monthly Cash Flow Planner</a>
+      <button type="button" class="page-link" id="export-btn" style="background: none; border: none; font: inherit; cursor: pointer; margin-left: 0.75rem;">Export data</button>
     </header>
 
     <div class="save-notice" id="save-notice">Changes aren't saving right now — they'll be lost if you reload or close this page.</div>
@@ -928,6 +929,26 @@
     document.getElementById('payday1').addEventListener('change', handlePaydayChange);
     document.getElementById('payday2').addEventListener('change', handlePaydayChange);
     document.getElementById('entry-form').addEventListener('submit', handleEntrySubmit);
+
+    function exportData() {
+      const envelope = {
+        exportedAt: new Date().toISOString(),
+        source: 'allocator.html',
+        version: 1,
+        data: state
+      };
+      const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'paycheck-allocator-export.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('export-btn').addEventListener('click', exportData);
 
     renderAll();
   </script>
