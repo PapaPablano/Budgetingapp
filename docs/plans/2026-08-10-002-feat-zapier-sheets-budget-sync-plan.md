@@ -1,7 +1,7 @@
 ---
 title: Add data export + agent-driven Google Sheets sync via Zapier MCP
 type: feat
-status: active
+status: completed
 date: 2026-08-10
 origin: docs/brainstorms/2026-08-10-zapier-mcp-budget-sync-requirements.md
 ---
