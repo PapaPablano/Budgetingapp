@@ -1,7 +1,7 @@
 ---
 title: Unify Budget Data Across Cash Flow Planner and Paycheck Allocator
 type: feat
-status: active
+status: completed
 date: 2026-08-10
 origin: docs/brainstorms/2026-08-10-unified-budget-data-requirements.md
 deepened: 2026-08-10
@@ -164,7 +164,7 @@ function computeMonthSummary(monthKey):
 
 ## Implementation Units
 
-- [ ] **Unit 1: Unify the data schema and migrate `allocator.html` to the shared store**
+- [x] **Unit 1: Unify the data schema and migrate `allocator.html` to the shared store**
 
 **Goal:** `allocator.html` reads/writes one shared `localStorage` key (`budget-v1`) with a schema extended to include `currentMonthKey` and `summary`, and persists month navigation instead of resetting to today on every load.
 
@@ -195,7 +195,7 @@ function computeMonthSummary(monthKey):
 **Verification:**
 - `allocator.html` reopens on the last-viewed month after a reload, and a fresh `budget-v1` key contains `currentMonthKey` after first load and after a reload.
 
-- [ ] **Unit 2: Fix the goal-funding gap in `verdictFromIncomeAndCosts`**
+- [x] **Unit 2: Fix the goal-funding gap in `verdictFromIncomeAndCosts`**
 
 **Goal:** `verdictFromIncomeAndCosts`'s `bills-exceed-income` branch returns goal-funding data (all unfunded) instead of omitting it, without changing any field `allocator.html`'s own UI currently reads from that branch.
 
@@ -222,7 +222,7 @@ function computeMonthSummary(monthKey):
 **Verification:**
 - For the worked example verified during planning (cycle income $300, bills $500, goal target $100), the fixed function returns `shortfall: 200` and `goals: [{ target: 100, funded: 0 }]` — confirmed via a standalone Node script during planning, to be re-confirmed in-browser during implementation.
 
-- [ ] **Unit 3: Compute and persist the month summary in `allocator.html`**
+- [x] **Unit 3: Compute and persist the month summary in `allocator.html`**
 
 **Goal:** `allocator.html` computes `state.summary` (total income, total bills, remaining, status) on every save, using the fixed verdict logic, so `index.html` never needs to compute anything itself.
 
@@ -255,7 +255,7 @@ function computeMonthSummary(monthKey):
 **Verification:**
 - For a range of hand-constructed test months (surplus, shortfall, awaiting-income, break-even, and the bills-exceed-income-with-goals case), `state.summary.remaining` matches manual calculation from summing `allocator.html`'s own two paycheck cards' true (goal-inclusive) figures.
 
-- [ ] **Unit 4: Rewrite `index.html` as a pure read-only display**
+- [x] **Unit 4: Rewrite `index.html` as a pure read-only display**
 
 **Goal:** `index.html` has no forms, no itemized lists, no verdict computation, and never writes — it renders `state.summary` and `state.currentMonthKey` directly.
 
