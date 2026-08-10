@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paycheck Allocator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg: #F7F5EF;
+      --surface: #ffffff;
+      --text: #2B2A26;
+      --text-muted: #8A8478;
+      --border: #E4DFD3;
+      --navy: #1F4E79;
+      --navy-bg: #EAF0F6;
+      --purple: #7030A0;
+      --purple-bg: #F3EAF8;
+      --gold: #7F5F00;
+      --gold-bg: #FBF3DC;
+      --negative: #B3261E;
+      --negative-bg: #FBEAE9;
+      --radius: 4px;
+      --sans: 'Helvetica Neue', Arial, sans-serif;
+      --serif: Georgia, 'Times New Roman', serif;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--serif);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.75rem 1rem 3.5rem;
+    }
+
+    header.page-header {
+      text-align: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .eyebrow {
+      font-family: var(--sans);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .month-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .month-nav h1 {
+      font-size: 1.6rem;
+      font-weight: 400;
+      margin: 0;
+      min-width: 12rem;
+      text-align: center;
+    }
+
+    .nav-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: var(--radius);
+      width: 1.9rem;
+      height: 1.9rem;
+      cursor: pointer;
+      font-size: 1.05rem;
+      line-height: 1;
+    }
+
+    .page-link {
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      display: inline-block;
+      margin-top: 0.4rem;
+    }
+    .page-link:hover { color: var(--navy); text-decoration: underline; }
+
+    .save-notice {
+      display: none;
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      color: var(--negative);
+      background: var(--negative-bg);
+      border: 1px solid var(--negative);
+      border-radius: var(--radius);
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    .save-notice.visible { display: block; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-eyebrow {
+      font-family: var(--sans);
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+    }
+    .section-eyebrow.navy { color: var(--navy); }
+    .section-eyebrow.purple { color: var(--purple); }
+    .section-eyebrow.gold { color: var(--gold); }
+
+    /* ---- Verdict dashboard ---- */
+    #verdict-dashboard { margin-bottom: 1rem; }
+
+    .paycheck-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+
+    .paycheck-card {
+      flex: 1 1 220px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.9rem;
+      cursor: pointer;
+    }
+    .paycheck-card.active { border-color: var(--gold); }
+
+    .paycheck-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-family: var(--sans);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .paycheck-card.active .paycheck-card-head { color: var(--gold); }
+
+    .income-input {
+      width: 100%;
+      font-family: var(--serif);
+      font-size: 1.1rem;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 0.5rem;
+    }
+
+    .verdict-line {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 0.35rem 0.55rem;
+      border-radius: var(--radius);
+      margin-bottom: 0.4rem;
+    }
+    .verdict-line.awaiting { color: var(--text-muted); background: var(--bg); }
+    .verdict-line.short, .verdict-line.bills-exceed { color: var(--negative); background: var(--negative-bg); }
+    .verdict-line.break-even { color: var(--navy); background: var(--navy-bg); }
+    .verdict-line.surplus { color: var(--gold); background: var(--gold-bg); }
+
+    .goal-detail { font-family: var(--sans); font-size: 0.75rem; color: var(--text-muted); margin: 0.1rem 0; }
+    .goal-detail.unfunded { color: var(--negative); }
+    .goal-detail.funded { color: var(--navy); }
+
+    .month-total-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.9rem 1.1rem;
+    }
+
+    /* ---- Lists / forms ---- */
+    .row {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+    .row input[type="text"] { flex: 1; min-width: 0; }
+    .row input[type="number"] { width: 6rem; }
+
+    input[type="text"], input[type="number"], select {
+      font-family: var(--serif);
+      font-size: 0.9rem;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .btn-icon {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.15rem 0.35rem;
+      flex-shrink: 0;
+    }
+    .btn-icon:hover { color: var(--negative); }
+    .btn-icon.reorder:hover { color: var(--navy); }
+
+    .btn-add {
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 0.3rem 0;
+    }
+    .btn-add.navy { color: var(--navy); }
+    .btn-add.purple { color: var(--purple); }
+    .btn-add.gold { color: var(--gold); }
+
+    .inline-note {
+      font-family: var(--sans);
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin: -0.2rem 0 0.6rem;
+    }
+
+    .empty-hint {
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      padding: 0.3rem 0;
+    }
+
+    .paydays-row { display: flex; gap: 1rem; margin-bottom: 0.75rem; }
+    .paydays-row label {
+      font-family: var(--sans);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .paydays-row input { display: block; margin-top: 0.3rem; width: 5rem; }
+    .field-error { font-family: var(--sans); font-size: 0.72rem; color: var(--negative); margin-top: 0.3rem; }
+
+    /* ---- Entry form / ledger ---- */
+    .entry-form { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    .entry-form select { flex: 1 1 160px; }
+    .entry-form input[type="number"] { flex: 0 1 6rem; }
+    .entry-form button {
+      font-family: var(--sans);
+      font-size: 0.8rem;
+      padding: 0.4rem 0.9rem;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--gold);
+      color: #fff;
+      cursor: pointer;
+    }
+    .entry-form button:disabled { background: var(--text-muted); cursor: not-allowed; }
+
+    .ledger-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px dotted var(--border);
+      font-size: 0.85rem;
+    }
+    .ledger-row:last-child { border-bottom: none; }
+    .ledger-target { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-btn {
+      font-family: var(--sans);
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 10px;
+      padding: 0.1rem 0.5rem;
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .status-btn.paid { border: 1px solid var(--navy); color: var(--navy); }
+    .status-btn.planned { border: 1px solid var(--gold); color: var(--gold); }
+    .ledger-amount { width: 5rem; }
+    .move-btn {
+      font-family: var(--sans);
+      font-size: 0.68rem;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: var(--radius);
+      padding: 0.1rem 0.35rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 540px) {
+      .paycheck-row { flex-direction: column; }
+      .paydays-row { flex-direction: column; gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="page-header">
+      <div class="eyebrow">Paycheck Allocator</div>
+      <div class="month-nav">
+        <button class="nav-btn" id="prev-month" aria-label="Previous month">&lsaquo;</button>
+        <h1 id="month-label"></h1>
+        <button class="nav-btn" id="next-month" aria-label="Next month">&rsaquo;</button>
+      </div>
+      <a class="page-link" href="index.html">&larr; Monthly Cash Flow Planner</a>
+    </header>
+
+    <div class="save-notice" id="save-notice">Changes aren't saving right now — they'll be lost if you reload or close this page.</div>
+
+    <section id="verdict-dashboard" aria-live="polite" aria-atomic="false">
+      <div class="paycheck-row">
+        <div class="paycheck-card" id="paycheck-card-1" data-cycle="1" tabindex="0" role="button" aria-label="Log entries against paycheck 1"></div>
+        <div class="paycheck-card" id="paycheck-card-2" data-cycle="2" tabindex="0" role="button" aria-label="Log entries against paycheck 2"></div>
+      </div>
+      <div class="month-total-card" id="month-total-card"></div>
+    </section>
+
+    <div class="card">
+      <div class="section-eyebrow navy" id="entry-form-label">Log an entry — Paycheck 1</div>
+      <form class="entry-form" id="entry-form">
+        <select id="entry-target" required></select>
+        <input type="number" id="entry-amount" placeholder="0.00" min="0.01" step="0.01" required>
+        <select id="entry-status">
+          <option value="paid">Paid</option>
+          <option value="planned">Planned</option>
+        </select>
+        <button type="submit" id="entry-submit">Log entry</button>
+      </form>
+      <div id="entry-form-hint" class="inline-note" style="display:none;">Add a bill, goal, or spending category below before logging an entry.</div>
+      <div class="section-eyebrow purple" style="margin-top:0.9rem;">Ledger — this paycheck</div>
+      <div id="ledger-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="section-eyebrow navy">Goals — in priority order</div>
+      <div class="inline-note">Editing or reordering a goal updates every month, past and future.</div>
+      <div id="goals-list"></div>
+      <button class="btn-add navy" id="add-goal">+ Add goal</button>
+    </div>
+
+    <div class="card">
+      <div class="section-eyebrow navy">Bills — fixed due date</div>
+      <div class="inline-note">Editing a bill updates every month, past and future.</div>
+      <div id="bills-list"></div>
+      <button class="btn-add navy" id="add-bill">+ Add bill</button>
+    </div>
+
+    <div class="card">
+      <div class="section-eyebrow purple">Spending categories — split evenly across paychecks</div>
+      <div class="inline-note">Editing a category updates every month, past and future.</div>
+      <div id="categories-list"></div>
+      <button class="btn-add purple" id="add-category">+ Add category</button>
+    </div>
+
+    <div class="card">
+      <div class="section-eyebrow gold">Paydays</div>
+      <div class="paydays-row">
+        <label>Payday 1<input type="number" id="payday1" min="1" max="28"></label>
+        <label>Payday 2<input type="number" id="payday2" min="1" max="28"></label>
+      </div>
+      <div class="field-error" id="paydays-error" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script>
+    /* ---------------------------------------------------------------
+       Unit 1: Data model & persistence
+    ---------------------------------------------------------------- */
+    const STORAGE_KEY = 'goal-paycheck-planner-v1';
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    function defaultState() {
+      return {
+        paydays: { p1: 1, p2: 15 },
+        goals: [],
+        bills: [],
+        categories: [],
+        months: {}
+      };
+    }
+
+    function emptyMonth() {
+      return { income: { p1: '', p2: '' }, entries: [] };
+    }
+
+    function normalizeMonth(m) {
+      const source = m && typeof m === 'object' ? m : {};
+      const income = source.income && typeof source.income === 'object' ? source.income : {};
+      return {
+        income: { p1: income.p1 ?? '', p2: income.p2 ?? '' },
+        entries: Array.isArray(source.entries) ? source.entries : []
+      };
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return defaultState();
+        const parsed = JSON.parse(raw);
+        const paydays = parsed.paydays && typeof parsed.paydays === 'object' ? parsed.paydays : { p1: 1, p2: 15 };
+        const months = {};
+        if (parsed.months && typeof parsed.months === 'object') {
+          Object.keys(parsed.months).forEach((mk) => { months[mk] = normalizeMonth(parsed.months[mk]); });
+        }
+        return {
+          paydays: { p1: paydays.p1 ?? 1, p2: paydays.p2 ?? 15 },
+          goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+          bills: Array.isArray(parsed.bills) ? parsed.bills : [],
+          categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+          months
+        };
+      } catch (e) {
+        return defaultState();
+      }
+    }
+
+    function saveState(state) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        setSaveNotice(false);
+      } catch (e) {
+        setSaveNotice(true);
+      }
+    }
+
+    function setSaveNotice(visible) {
+      const el = document.getElementById('save-notice');
+      el.classList.toggle('visible', visible);
+    }
+
+    function getOrCreateMonth(state, monthKey) {
+      if (!state.months[monthKey]) state.months[monthKey] = emptyMonth();
+      return state.months[monthKey];
+    }
+
+    let state = loadState();
+
+    function persist() {
+      saveState(state);
+    }
+
+    /* ---------------------------------------------------------------
+       Helpers: ids, money, dates
+    ---------------------------------------------------------------- */
+    const uid = (p) => p + '-' + crypto.randomUUID();
+    const roundCents = (n) => Math.round((Number(n) || 0) * 100) / 100;
+    const clampNonNegative = (n) => Math.max(0, roundCents(n));
+    const clampPositive = (n) => Math.max(0.01, roundCents(n));
+    const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+    const money = (n) => currency.format(n);
+    const ordinal = (n) => {
+      const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+    const monthKeyOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const shiftMonthKey = (key, dir) => {
+      const [y, m] = key.split('-').map(Number);
+      return monthKeyOf(new Date(y, m - 1 + dir, 1));
+    };
+
+    /* ---------------------------------------------------------------
+       Unit 2: Allocation & verdict computation
+    ---------------------------------------------------------------- */
+    function validPaydays(p1, p2) {
+      return Number.isInteger(p1) && Number.isInteger(p2) && p1 >= 1 && p1 <= 28 && p2 >= 1 && p2 <= 28 && p1 < p2;
+    }
+
+    function assignCycle(dueDay, p1, p2) {
+      return (dueDay >= p1 && dueDay < p2) ? 1 : 2;
+    }
+
+    function computeCycleBuckets(monthKey, cycle) {
+      const month = getOrCreateMonth(state, monthKey);
+      const entries = month.entries.filter((e) => e.cycle === cycle);
+      let budgeted = 0, overage = 0;
+      const processed = new Set();
+
+      function processBucket(targetType, targetId, baseAmount) {
+        processed.add(targetType + ':' + targetId);
+        const relevant = entries.filter((e) => e.targetType === targetType && e.targetId === targetId);
+        const plannedEntries = relevant.filter((e) => e.status === 'planned');
+        const plannedEntry = plannedEntries[plannedEntries.length - 1];
+        const bucketBudgeted = plannedEntry ? roundCents(plannedEntry.amount) : roundCents(baseAmount);
+        const spent = roundCents(relevant.filter((e) => e.status === 'paid').reduce((s, e) => s + (Number(e.amount) || 0), 0));
+        const bucketOverage = Math.max(0, roundCents(spent - bucketBudgeted));
+        budgeted = roundCents(budgeted + bucketBudgeted);
+        overage = roundCents(overage + bucketOverage);
+      }
+
+      state.bills
+        .filter((b) => assignCycle(b.dueDay, state.paydays.p1, state.paydays.p2) === cycle)
+        .forEach((b) => processBucket('bill', b.id, b.amount));
+
+      state.categories.forEach((c) => processBucket('category', c.id, roundCents(c.amount / 2)));
+
+      // An entry can end up logged against a bill/category that doesn't structurally
+      // belong to this cycle -- moved here via the ledger's move button, or the bill's
+      // due day / paydays changed after the entry was logged. Rather than silently
+      // dropping it, count its full amount as overage so it still affects the verdict.
+      entries.forEach((e) => {
+        if (e.targetType === 'goal' || processed.has(e.targetType + ':' + e.targetId)) return;
+        processBucket(e.targetType, e.targetId, 0);
+      });
+
+      return { budgeted, overage };
+    }
+
+    function fundGoals(goalTargets, remainingStart) {
+      let remaining = remainingStart;
+      const results = goalTargets.map((g) => {
+        const funded = Math.max(0, Math.min(g.target, remaining));
+        remaining = roundCents(remaining - funded);
+        return { id: g.id, name: g.name, target: g.target, funded };
+      });
+      return { results, remainingAfter: remaining };
+    }
+
+    function classifyVerdict(goalResults, remainingAfter) {
+      const shortfall = roundCents(goalResults.reduce((s, g) => s + (g.target - g.funded), 0));
+      if (shortfall > 0) return { status: 'short', shortfall };
+      if (remainingAfter === 0) return { status: 'break-even' };
+      return { status: 'surplus', surplus: remainingAfter };
+    }
+
+    function verdictFromIncomeAndCosts(income, budgetedAndOverage, goalTargets) {
+      if (budgetedAndOverage > income) {
+        return { status: 'bills-exceed-income', shortfall: roundCents(budgetedAndOverage - income), income };
+      }
+      const remainingStart = roundCents(income - budgetedAndOverage);
+      const { results, remainingAfter } = fundGoals(goalTargets, remainingStart);
+      return { ...classifyVerdict(results, remainingAfter), income, goals: results };
+    }
+
+    function goalTargetForCycle(goal, cycle) {
+      // Round each half independently would let the two halves sum to a cent more or
+      // less than the full target on odd-cent amounts; deriving cycle 2 as the
+      // remainder keeps the per-paycheck cards and the month total in agreement.
+      const cycle1Target = roundCents(goal.target / 2);
+      return cycle === 1 ? cycle1Target : roundCents(goal.target - cycle1Target);
+    }
+
+    function computeCycleVerdict(monthKey, cycle) {
+      const month = getOrCreateMonth(state, monthKey);
+      const incomeRaw = cycle === 1 ? month.income.p1 : month.income.p2;
+      const buckets = computeCycleBuckets(monthKey, cycle);
+
+      if (incomeRaw === '' || incomeRaw === null || incomeRaw === undefined) {
+        return { status: 'awaiting-income', cycle, buckets };
+      }
+      const income = roundCents(incomeRaw);
+      const budgetedAndOverage = roundCents(buckets.budgeted + buckets.overage);
+      const goalTargets = state.goals.map((g) => ({ id: g.id, name: g.name, target: goalTargetForCycle(g, cycle) }));
+      return { ...verdictFromIncomeAndCosts(income, budgetedAndOverage, goalTargets), buckets, cycle };
+    }
+
+    function computeMonthVerdict(monthKey) {
+      const month = getOrCreateMonth(state, monthKey);
+      const p1Raw = month.income.p1, p2Raw = month.income.p2;
+      const incomeEntered = p1Raw !== '' && p1Raw != null && p2Raw !== '' && p2Raw != null;
+      if (!incomeEntered) return { status: 'awaiting-income' };
+
+      const income = roundCents(Number(p1Raw) + Number(p2Raw));
+      const bucketsC1 = computeCycleBuckets(monthKey, 1);
+      const bucketsC2 = computeCycleBuckets(monthKey, 2);
+      const budgetedAndOverage = roundCents(bucketsC1.budgeted + bucketsC1.overage + bucketsC2.budgeted + bucketsC2.overage);
+      const goalTargets = state.goals.map((g) => ({ id: g.id, name: g.name, target: roundCents(g.target) }));
+      return verdictFromIncomeAndCosts(income, budgetedAndOverage, goalTargets);
+    }
+
+    function findMonthsReferencing(targetType, targetId) {
+      return Object.keys(state.months).filter((mk) =>
+        state.months[mk].entries.some((e) => e.targetType === targetType && e.targetId === targetId)
+      ).sort();
+    }
+
+    /* ---------------------------------------------------------------
+       View state
+    ---------------------------------------------------------------- */
+    let monthKey = monthKeyOf(new Date());
+    let activeCycle = new Date().getDate() >= state.paydays.p2 ? 2 : 1;
+
+    /* ---------------------------------------------------------------
+       Unit 3/5: Verdict dashboard rendering
+    ---------------------------------------------------------------- */
+    function verdictLineClass(status) {
+      if (status === 'awaiting-income') return 'awaiting';
+      if (status === 'bills-exceed-income') return 'bills-exceed';
+      return status; // short | break-even | surplus
+    }
+
+    function verdictLineText(v, label) {
+      switch (v.status) {
+        case 'awaiting-income': return `${label} — awaiting income`;
+        case 'bills-exceed-income': return `${label} — bills exceed income (short ${money(v.shortfall)})`;
+        case 'short': return `${label} — short ${money(v.shortfall)}`;
+        case 'break-even': return `${label} — covers everything, break-even`;
+        case 'surplus': return `${label} — covers everything, surplus ${money(v.surplus)}`;
+        default: return label;
+      }
+    }
+
+    function renderGoalDetails(v) {
+      if (!v.goals || v.goals.length === 0) return '';
+      return v.goals.map((g) => {
+        const funded = g.funded >= g.target;
+        return `<div class="goal-detail ${funded ? 'funded' : 'unfunded'}">${escapeAttr(g.name)}: ${money(g.funded)} of ${money(g.target)}</div>`;
+      }).join('');
+    }
+
+    function renderPaycheckCard(cycle) {
+      const el = document.getElementById(`paycheck-card-${cycle}`);
+      const month = getOrCreateMonth(state, monthKey);
+      const day = cycle === 1 ? state.paydays.p1 : state.paydays.p2;
+      const income = cycle === 1 ? month.income.p1 : month.income.p2;
+      const v = computeCycleVerdict(monthKey, cycle);
+
+      el.className = 'paycheck-card' + (activeCycle === cycle ? ' active' : '');
+      el.innerHTML = `
+        <div class="paycheck-card-head"><span>Check ${cycle} &middot; ${ordinal(day)}</span>${activeCycle === cycle ? '<span>logging here</span>' : ''}</div>
+        <input type="number" class="income-input" id="income-input-${cycle}" placeholder="0.00" min="0" step="0.01" value="${income}">
+        <div class="verdict-line ${verdictLineClass(v.status)}">${verdictLineText(v, 'This check')}</div>
+        ${renderGoalDetails(v)}
+      `;
+      document.getElementById(`income-input-${cycle}`).addEventListener('click', (e) => e.stopPropagation());
+      document.getElementById(`income-input-${cycle}`).addEventListener('change', (e) => {
+        month.income[cycle === 1 ? 'p1' : 'p2'] = e.target.value === '' ? '' : roundCents(e.target.value);
+        persist();
+        renderAll();
+      });
+    }
+
+    function renderMonthTotal() {
+      const el = document.getElementById('month-total-card');
+      const v = computeMonthVerdict(monthKey);
+      el.innerHTML = `
+        <div class="section-eyebrow gold">Month total</div>
+        <div class="verdict-line ${verdictLineClass(v.status)}">${verdictLineText(v, 'This month')}</div>
+        ${renderGoalDetails(v)}
+      `;
+    }
+
+    /* ---------------------------------------------------------------
+       Unit 4: Definitions management
+    ---------------------------------------------------------------- */
+    function renderGoals() {
+      const el = document.getElementById('goals-list');
+      if (state.goals.length === 0) {
+        el.innerHTML = '<div class="empty-hint">No goals yet — add one below.</div>';
+        return;
+      }
+      el.innerHTML = '';
+      state.goals.forEach((g, i) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <button class="btn-icon reorder" data-action="up" ${i === 0 ? 'disabled' : ''} aria-label="Move up">&uarr;</button>
+          <button class="btn-icon reorder" data-action="down" ${i === state.goals.length - 1 ? 'disabled' : ''} aria-label="Move down">&darr;</button>
+          <input type="text" data-field="name" value="${escapeAttr(g.name)}">
+          <input type="number" data-field="target" min="0" step="0.01" value="${g.target}">
+          <button class="btn-icon" data-action="remove" aria-label="Remove goal">&times;</button>
+        `;
+        row.querySelector('[data-field="name"]').addEventListener('change', (e) => { g.name = e.target.value.trim() || g.name; persist(); renderAll(); });
+        row.querySelector('[data-field="target"]').addEventListener('change', (e) => { g.target = clampNonNegative(e.target.value); persist(); renderAll(); });
+        row.querySelector('[data-action="up"]').addEventListener('click', () => { moveGoal(i, -1); });
+        row.querySelector('[data-action="down"]').addEventListener('click', () => { moveGoal(i, 1); });
+        row.querySelector('[data-action="remove"]').addEventListener('click', () => { removeDefinition('goal', g.id, () => { state.goals.splice(i, 1); }); });
+        el.appendChild(row);
+      });
+    }
+
+    function moveGoal(index, dir) {
+      const target = index + dir;
+      if (target < 0 || target >= state.goals.length) return;
+      const [g] = state.goals.splice(index, 1);
+      state.goals.splice(target, 0, g);
+      persist();
+      renderAll();
+    }
+
+    function renderBills() {
+      const el = document.getElementById('bills-list');
+      if (state.bills.length === 0) {
+        el.innerHTML = '<div class="empty-hint">No bills yet — add one below.</div>';
+        return;
+      }
+      el.innerHTML = '';
+      state.bills.forEach((b) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <input type="text" data-field="name" value="${escapeAttr(b.name)}">
+          <input type="number" data-field="amount" min="0" step="0.01" value="${b.amount}">
+          <input type="number" data-field="dueDay" min="1" max="28" title="Due day" value="${b.dueDay}">
+          <button class="btn-icon" data-action="remove" aria-label="Remove bill">&times;</button>
+        `;
+        row.querySelector('[data-field="name"]').addEventListener('change', (e) => { b.name = e.target.value.trim() || b.name; persist(); renderAll(); });
+        row.querySelector('[data-field="amount"]').addEventListener('change', (e) => { b.amount = clampNonNegative(e.target.value); persist(); renderAll(); });
+        row.querySelector('[data-field="dueDay"]').addEventListener('change', (e) => { b.dueDay = Math.min(28, Math.max(1, Number(e.target.value) || 1)); persist(); renderAll(); });
+        row.querySelector('[data-action="remove"]').addEventListener('click', () => { removeDefinition('bill', b.id, () => { state.bills = state.bills.filter((x) => x.id !== b.id); }); });
+        el.appendChild(row);
+      });
+    }
+
+    function renderCategories() {
+      const el = document.getElementById('categories-list');
+      if (state.categories.length === 0) {
+        el.innerHTML = '<div class="empty-hint">No spending categories yet — add one below.</div>';
+        return;
+      }
+      el.innerHTML = '';
+      state.categories.forEach((c) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <input type="text" data-field="name" value="${escapeAttr(c.name)}">
+          <input type="number" data-field="amount" min="0" step="0.01" value="${c.amount}">
+          <button class="btn-icon" data-action="remove" aria-label="Remove category">&times;</button>
+        `;
+        row.querySelector('[data-field="name"]').addEventListener('change', (e) => { c.name = e.target.value.trim() || c.name; persist(); renderAll(); });
+        row.querySelector('[data-field="amount"]').addEventListener('change', (e) => { c.amount = clampNonNegative(e.target.value); persist(); renderAll(); });
+        row.querySelector('[data-action="remove"]').addEventListener('click', () => { removeDefinition('category', c.id, () => { state.categories = state.categories.filter((x) => x.id !== c.id); }); });
+        el.appendChild(row);
+      });
+    }
+
+    function removeDefinition(targetType, targetId, doRemove) {
+      const months = findMonthsReferencing(targetType, targetId);
+      if (months.length > 0) {
+        alert(`Can't remove this — it has logged entries in: ${months.join(', ')}. Remove or reassign those entries first.`);
+        return;
+      }
+      doRemove();
+      persist();
+      renderAll();
+    }
+
+    function escapeAttr(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function renderPaydays() {
+      document.getElementById('payday1').value = state.paydays.p1;
+      document.getElementById('payday2').value = state.paydays.p2;
+      const errEl = document.getElementById('paydays-error');
+      if (validPaydays(state.paydays.p1, state.paydays.p2)) {
+        errEl.style.display = 'none';
+      } else {
+        errEl.textContent = 'Payday 1 must be before payday 2, both between 1 and 28.';
+        errEl.style.display = 'block';
+      }
+    }
+
+    function handlePaydayChange() {
+      const p1 = Number(document.getElementById('payday1').value);
+      const p2 = Number(document.getElementById('payday2').value);
+      if (!validPaydays(p1, p2)) {
+        document.getElementById('paydays-error').textContent = 'Payday 1 must be before payday 2, both between 1 and 28.';
+        document.getElementById('paydays-error').style.display = 'block';
+        return;
+      }
+      state.paydays = { p1, p2 };
+      persist();
+      renderAll();
+    }
+
+    /* ---------------------------------------------------------------
+       Unit 6: Entry logging, ledger, month navigation
+    ---------------------------------------------------------------- */
+    function allTargets() {
+      return [
+        ...state.goals.map((g) => ({ targetType: 'goal', targetId: g.id, name: g.name })),
+        ...state.bills.map((b) => ({ targetType: 'bill', targetId: b.id, name: b.name })),
+        ...state.categories.map((c) => ({ targetType: 'category', targetId: c.id, name: c.name }))
+      ];
+    }
+
+    function targetName(targetType, targetId) {
+      const found = allTargets().find((t) => t.targetType === targetType && t.targetId === targetId);
+      return found ? found.name : '(removed)';
+    }
+
+    function renderEntryForm() {
+      document.getElementById('entry-form-label').textContent = `Log an entry — Paycheck ${activeCycle}`;
+      const select = document.getElementById('entry-target');
+      const targets = allTargets();
+      const hint = document.getElementById('entry-form-hint');
+      const submit = document.getElementById('entry-submit');
+
+      if (targets.length === 0) {
+        select.innerHTML = '';
+        select.disabled = true;
+        submit.disabled = true;
+        hint.style.display = 'block';
+        return;
+      }
+      hint.style.display = 'none';
+      select.disabled = false;
+      submit.disabled = false;
+
+      const groups = { bill: 'Bills', goal: 'Goals', category: 'Categories' };
+      select.innerHTML = ['bill', 'goal', 'category'].map((type) => {
+        const items = targets.filter((t) => t.targetType === type);
+        if (items.length === 0) return '';
+        return `<optgroup label="${groups[type]}">${items.map((t) =>
+          `<option value="${t.targetType}:${t.targetId}">${escapeAttr(t.name)}</option>`
+        ).join('')}</optgroup>`;
+      }).join('');
+    }
+
+    function renderLedger() {
+      const month = getOrCreateMonth(state, monthKey);
+      const entries = month.entries.filter((e) => e.cycle === activeCycle);
+      const el = document.getElementById('ledger-list');
+      if (entries.length === 0) {
+        el.innerHTML = '<div class="empty-hint">Nothing logged yet for this paycheck.</div>';
+        return;
+      }
+      el.innerHTML = '';
+      entries.forEach((e) => {
+        const row = document.createElement('div');
+        row.className = 'ledger-row';
+        row.innerHTML = `
+          <button class="status-btn ${e.status}" data-action="toggle">${e.status}</button>
+          <span class="ledger-target">${escapeAttr(targetName(e.targetType, e.targetId))}</span>
+          <input type="number" class="ledger-amount" min="0.01" step="0.01" value="${e.amount}">
+          <button class="move-btn" data-action="move">&rarr;${e.cycle === 1 ? '2' : '1'}</button>
+          <button class="btn-icon" data-action="remove" aria-label="Remove entry">&times;</button>
+        `;
+        row.querySelector('[data-action="toggle"]').addEventListener('click', () => {
+          e.status = e.status === 'paid' ? 'planned' : 'paid';
+          persist(); renderAll();
+        });
+        row.querySelector('.ledger-amount').addEventListener('change', (ev) => {
+          e.amount = clampPositive(ev.target.value);
+          persist(); renderAll();
+        });
+        row.querySelector('[data-action="move"]').addEventListener('click', () => {
+          e.cycle = e.cycle === 1 ? 2 : 1;
+          persist(); renderAll();
+        });
+        row.querySelector('[data-action="remove"]').addEventListener('click', () => {
+          month.entries = month.entries.filter((x) => x.id !== e.id);
+          persist(); renderAll();
+        });
+        el.appendChild(row);
+      });
+    }
+
+    function handleEntrySubmit(ev) {
+      ev.preventDefault();
+      const select = document.getElementById('entry-target');
+      if (!select.value) return;
+      const [targetType, targetId] = select.value.split(':');
+      const amount = roundCents(document.getElementById('entry-amount').value);
+      if (!amount || amount <= 0) return;
+      const status = document.getElementById('entry-status').value;
+      const month = getOrCreateMonth(state, monthKey);
+      month.entries.push({ id: uid('e'), targetType, targetId, amount, status, cycle: activeCycle });
+      document.getElementById('entry-amount').value = '';
+      persist();
+      renderAll();
+    }
+
+    /* ---------------------------------------------------------------
+       Orchestration
+    ---------------------------------------------------------------- */
+    function renderMonthHeader() {
+      const [y, m] = monthKey.split('-').map(Number);
+      document.getElementById('month-label').textContent = `${MONTH_NAMES[m - 1]} ${y}`;
+    }
+
+    function renderAll() {
+      renderMonthHeader();
+      renderPaycheckCard(1);
+      renderPaycheckCard(2);
+      renderMonthTotal();
+      renderGoals();
+      renderBills();
+      renderCategories();
+      renderPaydays();
+      renderEntryForm();
+      renderLedger();
+    }
+
+    document.getElementById('prev-month').addEventListener('click', () => { monthKey = shiftMonthKey(monthKey, -1); renderAll(); });
+    document.getElementById('next-month').addEventListener('click', () => { monthKey = shiftMonthKey(monthKey, 1); renderAll(); });
+    function selectCycle(cycle) { activeCycle = cycle; renderAll(); }
+    function onCardKeydown(cycle) {
+      return (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); selectCycle(cycle); } };
+    }
+    document.getElementById('paycheck-card-1').addEventListener('click', () => selectCycle(1));
+    document.getElementById('paycheck-card-1').addEventListener('keydown', onCardKeydown(1));
+    document.getElementById('paycheck-card-2').addEventListener('click', () => selectCycle(2));
+    document.getElementById('paycheck-card-2').addEventListener('keydown', onCardKeydown(2));
+    document.getElementById('add-goal').addEventListener('click', () => { state.goals.push({ id: uid('g'), name: 'New goal', target: 0 }); persist(); renderAll(); });
+    document.getElementById('add-bill').addEventListener('click', () => { state.bills.push({ id: uid('b'), name: 'New bill', amount: 0, dueDay: 1 }); persist(); renderAll(); });
+    document.getElementById('add-category').addEventListener('click', () => { state.categories.push({ id: uid('c'), name: 'New category', amount: 0 }); persist(); renderAll(); });
+    document.getElementById('payday1').addEventListener('change', handlePaydayChange);
+    document.getElementById('payday2').addEventListener('change', handlePaydayChange);
+    document.getElementById('entry-form').addEventListener('submit', handleEntrySubmit);
+
+    renderAll();
+  </script>
+</body>
+</html>

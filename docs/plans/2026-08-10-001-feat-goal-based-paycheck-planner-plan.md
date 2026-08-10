@@ -1,7 +1,7 @@
 ---
 title: Goal-Based Paycheck Planner Page
 type: feat
-status: active
+status: completed
 date: 2026-08-10
 origin: docs/brainstorms/2026-08-10-goal-based-paycheck-planner-requirements.md
 ---
@@ -149,7 +149,7 @@ The month-level verdict re-runs this same flow with summed income and full (un-h
 
 ## Implementation Units
 
-- [ ] **Unit 1: Data model & persistence**
+- [x] **Unit 1: Data model & persistence**
 
 **Goal:** Establish the state shape, `localStorage` load/save, and month-key scoping that every later unit builds on.
 
@@ -184,7 +184,7 @@ The month-level verdict re-runs this same flow with summed income and full (un-h
 
 ---
 
-- [ ] **Unit 2: Allocation & verdict computation**
+- [x] **Unit 2: Allocation & verdict computation**
 
 **Goal:** Pure computation functions for per-cycle and month-level allocation, funding, and verdict state — the core "does the money make it" logic, kept free of DOM code so it's easy to reason about and manually verify against worked examples.
 
@@ -226,7 +226,7 @@ The month-level verdict re-runs this same flow with summed income and full (un-h
 
 ---
 
-- [ ] **Unit 3: Page shell, styling, and cross-page nav**
+- [x] **Unit 3: Page shell, styling, and cross-page nav**
 
 **Goal:** Stand up `allocator.html` as a real page with the draft's visual identity, and link the two pages together.
 
@@ -258,7 +258,7 @@ The month-level verdict re-runs this same flow with summed income and full (un-h
 
 ---
 
-- [ ] **Unit 4: Definitions management (goals, bills, categories, paydays)**
+- [x] **Unit 4: Definitions management (goals, bills, categories, paydays)**
 
 **Goal:** CRUD UI for the global definitions — goals (with reordering), bills, spending categories, and payday configuration — including the edit/remove-blocked-while-referenced rule.
 
@@ -291,7 +291,7 @@ The month-level verdict re-runs this same flow with summed income and full (un-h
 
 ---
 
-- [ ] **Unit 5: Paycheck dashboard & verdict display**
+- [x] **Unit 5: Paycheck dashboard & verdict display**
 
 **Goal:** Render the two paycheck cards (income input + per-cycle verdict) and the month-total verdict, using Unit 2's computation functions — this is the page's central, highest-value surface.
 
@@ -323,7 +323,7 @@ The month-level verdict re-runs this same flow with summed income and full (un-h
 
 ---
 
-- [ ] **Unit 6: Entry logging, ledger, and month navigation**
+- [x] **Unit 6: Entry logging, ledger, and month navigation**
 
 **Goal:** Structured entry form and ledger (replacing the draft's free-text parser), plus prev/next month navigation.
 
