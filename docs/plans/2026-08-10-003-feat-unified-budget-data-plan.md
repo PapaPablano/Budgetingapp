@@ -208,15 +208,15 @@ function computeMonthSummary(monthKey):
 
 **Approach:**
 - In the `bills-exceed-income` branch (`allocator.html:557-559`), call `fundGoals(goalTargets, 0)` and include the resulting `results` as a `goals` field on the returned object, alongside the existing `status`/`shortfall`/`income` fields (which are unchanged).
-- Confirm nothing in `allocator.html`'s own rendering of a `bills-exceed-income` verdict reads a `goals` field today (it doesn't, per the code read during planning) — so this is purely additive and invisible to `allocator.html`'s current UI.
+- **Correction made during implementation:** the plan originally claimed this would be invisible to `allocator.html`'s own UI. That was checked against the code during implementation and found incorrect — `renderGoalDetails(v)` (`allocator.html:642-648`) is called unconditionally for both paycheck cards and the month total, gated only on whether `v.goals` is present, not on `status`. So a `bills-exceed-income` paycheck card with active goals will now additionally show each goal as "$0.00 of $X.XX" in the existing `.goal-detail.unfunded` red styling — correctly communicating that the goal isn't funded that paycheck, consistent with how the `short` status already displays this. This is a small, accurate, arguably-beneficial visible change, not a hidden one; noted here rather than silently shipped as "invisible."
 
 **Patterns to follow:**
 - The `surplus`/`short` branch's existing pattern of calling `fundGoals` and including `goals: results` (`allocator.html:562`) — this unit makes the `bills-exceed-income` branch do the equivalent, funding against `0` instead of a positive remaining amount.
 
 **Test scenarios:**
 - Happy path: a cycle with bills exceeding income and an active goal → the verdict object now includes `goals: [{ ..., funded: 0 }]` for each goal, while `status`/`shortfall` are unchanged from before this fix.
-- Edge case: a cycle with bills exceeding income and no goals defined → `goals: []`, no behavior change.
-- Integration: `allocator.html`'s own paycheck card for a bills-exceed-income cycle renders identically before and after this fix (visual regression check, since the fix only adds a field the current UI doesn't consume).
+- Edge case: a cycle with bills exceeding income and no goals defined → `goals: []`, no visible change (matches `renderGoalDetails`'s existing empty-array guard).
+- Integration: `allocator.html`'s bills-exceed-income paycheck card now shows each goal as unfunded ($0.00 of target) in red — confirmed as an intentional, correct display change, not a regression.
 - Test expectation: manual browser verification (no test framework in this repo).
 
 **Verification:**
@@ -305,7 +305,7 @@ function computeMonthSummary(monthKey):
 |------|------------|
 | `index.html` accidentally gains a write path during implementation | Unit 4 makes "never writes" an explicit verification step |
 | `state.summary` goes stale relative to source data if a future state mutation bypasses `persist()` | `computeMonthSummary` runs inside `persist()` itself (Unit 3), the single existing save path every mutation already goes through |
-| The `verdictFromIncomeAndCosts` fix (Unit 2) is additive but touches a function `allocator.html`'s own UI depends on | Unit 2's test scenarios include an explicit visual-regression check that `allocator.html`'s own bills-exceed-income card renders identically before/after |
+| The `verdictFromIncomeAndCosts` fix (Unit 2) touches a function `allocator.html`'s own UI depends on, and does cause a small visible change (bills-exceed-income cards with active goals now show them as unfunded) — caught during implementation, not planning | Confirmed intentional and correct (matches how `short` status already displays unfunded goals) rather than a silent regression; documented in Unit 2 |
 | Two browser tabs open simultaneously show inconsistent data until reload | Accepted, documented — `index.html`'s read-only invariant prevents data loss even in this case, just not staleness |
 | `allocator.html`'s reload behavior changes (now reopens on last-viewed month, not always today) | Confirmed as an accepted, deliberate consequence of R5 with the user during planning |
 | Old `localStorage` keys remain orphaned after this ships | Accepted as harmless for a single-user personal app |
