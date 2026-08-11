@@ -110,143 +110,15 @@
 
     .summary-card.remaining.negative .value { color: var(--negative); }
 
-    .section {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin-bottom: 1rem;
-      overflow: hidden;
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border);
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-
-    .section-header.income { background: var(--income-bg); color: var(--income); }
-    .section-header.bills { background: var(--bills-bg); color: var(--bills); }
-
-    .entry-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    .entry-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .entry-row:last-child { border-bottom: none; }
-
-    .entry-label {
-      flex: 1;
-      min-width: 0;
-      padding: 0.35rem 0.5rem;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      font-size: 0.95rem;
-      background: transparent;
-      color: var(--text);
-    }
-
-    .entry-label:hover,
-    .entry-label:focus {
-      border-color: var(--border);
-      background: var(--bg);
-      outline: none;
-    }
-
-    .entry-amount {
-      width: 7rem;
-      padding: 0.35rem 0.5rem;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      font-size: 0.95rem;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      background: transparent;
-      color: var(--text);
-    }
-
-    .entry-amount:hover,
-    .entry-amount:focus {
-      border-color: var(--border);
-      background: var(--bg);
-      outline: none;
-    }
-
-    .btn-delete {
-      flex-shrink: 0;
-      width: 2rem;
-      height: 2rem;
-      border: none;
-      background: transparent;
+    .summary-card.income.awaiting .value,
+    .summary-card.remaining.awaiting .value {
       color: var(--text-muted);
-      font-size: 1.25rem;
-      line-height: 1;
-      cursor: pointer;
-      border-radius: 4px;
+      font-size: 1.1rem;
     }
 
-    .btn-delete:hover {
-      background: var(--negative-bg);
-      color: var(--negative);
-    }
-
-    .add-form {
-      display: flex;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
+    .summary-card.remaining.awaiting {
       background: var(--bg);
-      border-top: 1px solid var(--border);
-    }
-
-    .add-form input[type="text"] {
-      flex: 1;
-      min-width: 0;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 0.95rem;
-    }
-
-    .add-form input[type="number"] {
-      width: 7rem;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-size: 0.95rem;
-      text-align: right;
-    }
-
-    .add-form button {
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 4px;
-      background: var(--accent);
-      color: white;
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-
-    .add-form button:hover { opacity: 0.9; }
-
-    .empty-hint {
-      padding: 1rem;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.9rem;
+      border-color: var(--border);
     }
   </style>
 </head>
@@ -263,7 +135,7 @@
     </header>
 
     <div class="summary">
-      <div class="summary-card income">
+      <div class="summary-card income" id="income-card">
         <div class="label">Total Income</div>
         <div class="value" id="total-income">$0.00</div>
       </div>
@@ -276,46 +148,51 @@
         <div class="value" id="remaining">$0.00</div>
       </div>
     </div>
-
-    <div class="section">
-      <div class="section-header income">Income</div>
-      <ul class="entry-list" id="income-list"></ul>
-      <form class="add-form" id="income-form">
-        <input type="text" id="income-label" placeholder="Description" autocomplete="off">
-        <input type="number" id="income-amount" placeholder="0.00" min="0" step="0.01" autocomplete="off">
-        <button type="submit">Add</button>
-      </form>
-    </div>
-
-    <div class="section">
-      <div class="section-header bills">Bills</div>
-      <ul class="entry-list" id="bills-list"></ul>
-      <form class="add-form" id="bills-form">
-        <input type="text" id="bills-label" placeholder="Description" autocomplete="off">
-        <input type="number" id="bills-amount" placeholder="0.00" min="0" step="0.01" autocomplete="off">
-        <button type="submit">Add</button>
-      </form>
-    </div>
   </div>
 
   <script>
-    const STORAGE_KEY = 'budgetPlanner-v1';
+    const STORAGE_KEY = 'budget-v1';
+    const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
     const currency = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
     });
 
-    function getCurrentMonth() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      return `${year}-${month}`;
+    function defaultState() {
+      return { paydays: { p1: 1, p2: 15 }, goals: [], bills: [], categories: [], months: {}, currentMonthKey: null, summary: null };
     }
 
-    function getMonthLabel() {
+    // Read-only mirror of allocator.html's shared schema. index.html never calls
+    // localStorage.setItem — allocator.html is the sole writer to budget-v1.
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return defaultState();
+        const parsed = JSON.parse(raw);
+        return {
+          paydays: parsed.paydays && typeof parsed.paydays === 'object' ? parsed.paydays : { p1: 1, p2: 15 },
+          goals: Array.isArray(parsed.goals) ? parsed.goals : [],
+          bills: Array.isArray(parsed.bills) ? parsed.bills : [],
+          categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+          months: parsed.months && typeof parsed.months === 'object' ? parsed.months : {},
+          currentMonthKey: typeof parsed.currentMonthKey === 'string' ? parsed.currentMonthKey : null,
+          summary: parsed.summary && typeof parsed.summary === 'object' ? parsed.summary : null
+        };
+      } catch {
+        return defaultState();
+      }
+    }
+
+    function getCurrentMonthKey() {
       const now = new Date();
-      return now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function getMonthLabel(monthKey) {
+      if (!monthKey) return '';
+      const [y, m] = monthKey.split('-').map(Number);
+      return `${MONTH_NAMES[m - 1]} ${y}`;
     }
 
     function getDaysRemaining() {
@@ -324,208 +201,53 @@
       return lastDay - now.getDate();
     }
 
-    function generateId() {
-      return crypto.randomUUID();
-    }
-
-    function createEmptyState() {
-      return {
-        month: getCurrentMonth(),
-        income: [],
-        bills: []
-      };
-    }
-
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return createEmptyState();
-
-        const parsed = JSON.parse(raw);
-        const currentMonth = getCurrentMonth();
-
-        if (parsed.month !== currentMonth) {
-          const carryForward = confirm(
-            `Your saved data is from ${parsed.month}. Start fresh for ${getMonthLabel()}, or keep your existing entries?`
-          );
-          if (carryForward) {
-            return {
-              month: currentMonth,
-              income: parsed.income || [],
-              bills: parsed.bills || []
-            };
-          }
-          return createEmptyState();
-        }
-
-        return {
-          month: currentMonth,
-          income: parsed.income || [],
-          bills: parsed.bills || []
-        };
-      } catch {
-        return createEmptyState();
-      }
-    }
-
-    function saveState(state) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
-
-    function parseAmount(value) {
-      const num = parseFloat(value);
-      if (isNaN(num) || num < 0) return 0;
-      return Math.round(num * 100) / 100;
-    }
-
-    function sumEntries(entries) {
-      return entries.reduce((total, entry) => total + (entry.amount || 0), 0);
-    }
-
-    let state = loadState();
+    const state = loadState();
 
     const monthContext = document.getElementById('month-context');
+    const incomeCard = document.getElementById('income-card');
     const totalIncomeEl = document.getElementById('total-income');
     const totalBillsEl = document.getElementById('total-bills');
     const remainingEl = document.getElementById('remaining');
     const remainingCard = document.getElementById('remaining-card');
-    const incomeList = document.getElementById('income-list');
-    const billsList = document.getElementById('bills-list');
 
     function renderHeader() {
-      const days = getDaysRemaining();
-      const dayWord = days === 1 ? 'day' : 'days';
-      monthContext.textContent = `Planning for ${getMonthLabel()} — ${days} ${dayWord} left in the month`;
+      const monthLabel = getMonthLabel(state.currentMonthKey);
+      if (!monthLabel) {
+        monthContext.textContent = 'No data yet — add bills and income on the Paycheck Allocator to get started.';
+        return;
+      }
+      if (state.currentMonthKey === getCurrentMonthKey()) {
+        const days = getDaysRemaining();
+        const dayWord = days === 1 ? 'day' : 'days';
+        monthContext.textContent = `Planning for ${monthLabel} — ${days} ${dayWord} left in the month`;
+      } else {
+        monthContext.textContent = `Planning for ${monthLabel}`;
+      }
     }
 
     function renderSummary() {
-      const totalIncome = sumEntries(state.income);
-      const totalBills = sumEntries(state.bills);
-      const remaining = totalIncome - totalBills;
+      const summary = state.summary;
+      // Treat a missing/malformed summary the same as "awaiting" rather than formatting
+      // undefined figures -- guards against a legacy or corrupted budget-v1 value, not just
+      // the genuine awaiting-income case.
+      const hasFigures = summary && summary.status !== 'awaiting'
+        && typeof summary.totalIncome === 'number' && typeof summary.remaining === 'number';
+      const awaitingIncome = !hasFigures;
+      const totalBills = summary && typeof summary.totalBills === 'number' ? summary.totalBills : 0;
 
-      totalIncomeEl.textContent = currency.format(totalIncome);
+      totalIncomeEl.textContent = awaitingIncome ? 'Awaiting income' : currency.format(summary.totalIncome);
       totalBillsEl.textContent = currency.format(totalBills);
-      remainingEl.textContent = currency.format(remaining);
+      remainingEl.textContent = awaitingIncome ? 'Awaiting income' : currency.format(summary.remaining);
 
-      remainingCard.classList.remove('positive', 'negative');
-      remainingCard.classList.add(remaining >= 0 ? 'positive' : 'negative');
-    }
-
-    function renderEntryRow(entry, type) {
-      const li = document.createElement('li');
-      li.className = 'entry-row';
-      li.dataset.id = entry.id;
-      li.dataset.type = type;
-
-      const labelInput = document.createElement('input');
-      labelInput.type = 'text';
-      labelInput.className = 'entry-label';
-      labelInput.value = entry.label;
-      labelInput.addEventListener('blur', () => updateEntry(type, entry.id, 'label', labelInput.value));
-      labelInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') labelInput.blur();
-      });
-
-      const amountInput = document.createElement('input');
-      amountInput.type = 'number';
-      amountInput.className = 'entry-amount';
-      amountInput.min = '0';
-      amountInput.step = '0.01';
-      amountInput.value = entry.amount;
-      amountInput.addEventListener('blur', () => updateEntry(type, entry.id, 'amount', amountInput.value));
-      amountInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') amountInput.blur();
-      });
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.className = 'btn-delete';
-      deleteBtn.setAttribute('aria-label', 'Delete entry');
-      deleteBtn.textContent = '×';
-      deleteBtn.addEventListener('click', () => deleteEntry(type, entry.id));
-
-      li.appendChild(labelInput);
-      li.appendChild(amountInput);
-      li.appendChild(deleteBtn);
-      return li;
-    }
-
-    function renderList(listEl, entries, type) {
-      listEl.innerHTML = '';
-      if (entries.length === 0) {
-        const hint = document.createElement('li');
-        hint.className = 'empty-hint';
-        hint.textContent = type === 'income' ? 'No income added yet' : 'No bills added yet';
-        listEl.appendChild(hint);
-        return;
-      }
-      entries.forEach(entry => listEl.appendChild(renderEntryRow(entry, type)));
+      incomeCard.classList.toggle('awaiting', awaitingIncome);
+      remainingCard.classList.remove('positive', 'negative', 'awaiting');
+      remainingCard.classList.add(awaitingIncome ? 'awaiting' : (summary.remaining >= 0 ? 'positive' : 'negative'));
     }
 
     function render() {
       renderHeader();
-      renderList(incomeList, state.income, 'income');
-      renderList(billsList, state.bills, 'bills');
       renderSummary();
     }
-
-    function updateEntry(type, id, field, value) {
-      const entries = state[type];
-      const entry = entries.find(e => e.id === id);
-      if (!entry) return;
-
-      if (field === 'label') {
-        entry.label = value.trim() || 'Untitled';
-      } else if (field === 'amount') {
-        entry.amount = parseAmount(value);
-      }
-
-      saveState(state);
-      renderSummary();
-    }
-
-    function deleteEntry(type, id) {
-      state[type] = state[type].filter(e => e.id !== id);
-      saveState(state);
-      render();
-    }
-
-    function addEntry(type, label, amount) {
-      const parsed = parseAmount(amount);
-      if (parsed <= 0) return false;
-
-      state[type].push({
-        id: generateId(),
-        label: label.trim() || 'Untitled',
-        amount: parsed
-      });
-
-      saveState(state);
-      render();
-      return true;
-    }
-
-    document.getElementById('income-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const labelInput = document.getElementById('income-label');
-      const amountInput = document.getElementById('income-amount');
-      if (addEntry('income', labelInput.value, amountInput.value)) {
-        labelInput.value = '';
-        amountInput.value = '';
-        labelInput.focus();
-      }
-    });
-
-    document.getElementById('bills-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const labelInput = document.getElementById('bills-label');
-      const amountInput = document.getElementById('bills-amount');
-      if (addEntry('bills', labelInput.value, amountInput.value)) {
-        labelInput.value = '';
-        amountInput.value = '';
-        labelInput.focus();
-      }
-    });
 
     function exportData() {
       const envelope = {
