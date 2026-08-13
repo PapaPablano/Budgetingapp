@@ -267,6 +267,8 @@
       remainingCard.classList.add(awaitingIncome ? 'awaiting' : (summary.remaining >= 0 ? 'positive' : 'negative'));
     }
 
+    const TREND_STRIP_MAX_MONTHS = 6;
+
     function renderTrendStrip() {
       const mount = document.getElementById('trend-strip-mount');
       const history = state.history || {};
@@ -275,7 +277,7 @@
       const monthKeys = Object.keys(history)
         .filter((mk) => history[mk] && typeof history[mk] === 'object' && typeof history[mk].status === 'string')
         .sort()
-        .slice(-6);
+        .slice(-TREND_STRIP_MAX_MONTHS);
 
       if (monthKeys.length === 0) {
         mount.innerHTML = '';

@@ -474,23 +474,32 @@
 
     function persist() {
       state.summary = computeMonthSummary(monthKey);
-      // Only the real current calendar month's history entry updates live -- persist() also
-      // runs on mere navigation (prev/next-month handlers), not just edits, so gating on
-      // monthKeyOf(new Date()) rather than on monthKey itself is what keeps browsing to a
-      // past month from silently overwriting its already-frozen figure with today's bill data.
-      if (monthKey === monthKeyOf(new Date())) {
-        state.history[monthKey] = state.summary;
-      }
+      // Always refresh the REAL current calendar month's history entry, regardless of which
+      // month is currently displayed -- not gated on `monthKey` itself. Bills/goals are global,
+      // so an edit made while merely browsing a different month must still update today's live
+      // figure; gating on the displayed month (an earlier version of this function) left today's
+      // entry stale until the user happened to navigate back to it. This also self-heals a
+      // phantom future-month entry the moment that month actually becomes current. Every other
+      // month's entry, once written, is untouched by this call regardless of what triggered it.
+      const realCurrentMonthKey = monthKeyOf(new Date());
+      state.history[realCurrentMonthKey] = monthKey === realCurrentMonthKey
+        ? { ...state.summary }
+        : computeMonthSummary(realCurrentMonthKey);
       saveState(state);
     }
 
     // One-time-per-month backfill: fills in a best-effort snapshot (from today's bill/goal
-    // definitions) for any month that has never had a live history write. Never overwrites an
-    // existing entry, so it's safe to run unconditionally on every load.
+    // definitions) for any past-or-current month that has never had a live history write. Never
+    // overwrites an existing entry, so it's safe to run unconditionally on every load. Skips
+    // future months -- merely previewing an upcoming month via prev/next-month navigation
+    // auto-creates an empty state.months entry (via getOrCreateMonth), and backfilling that
+    // would permanently freeze a meaningless "awaiting" snapshot before the month is ever live,
+    // where it could displace a real month in index.html's "last 6" trend strip.
     function backfillHistory() {
+      const realCurrentMonthKey = monthKeyOf(new Date());
       let added = false;
       Object.keys(state.months).forEach((mk) => {
-        if (!state.history[mk]) {
+        if (!state.history[mk] && mk <= realCurrentMonthKey) {
           state.history[mk] = computeMonthSummary(mk);
           added = true;
         }

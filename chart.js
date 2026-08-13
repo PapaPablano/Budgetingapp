@@ -16,9 +16,9 @@ function escapeSvgText(s) {
    path breaks on either side of it rather than interpolating through a fabricated position. */
 function sparkline(points, options) {
   options = options || {};
-  const width = options.width || 240;
-  const height = options.height || 60;
-  const pointRadius = options.pointRadius || 3;
+  const width = options.width ?? 240;
+  const height = options.height ?? 60;
+  const pointRadius = options.pointRadius ?? 3;
   const ariaLabel = options.ariaLabel || '';
 
   if (!Array.isArray(points) || points.length === 0) return '';
@@ -79,8 +79,8 @@ function sparkline(points, options) {
    multi-bar comparison. */
 function bar(segments, options) {
   options = options || {};
-  const width = options.width || 240;
-  const height = options.height || 24;
+  const width = options.width ?? 240;
+  const height = options.height ?? 24;
   const orientation = options.orientation || 'horizontal';
 
   if (!Array.isArray(segments) || segments.length === 0) return '';
@@ -97,6 +97,9 @@ function bar(segments, options) {
       const title = s.label ? `<title>${escapeSvgText(s.label)}</title>` : '';
       let rect;
       if (orientation === 'vertical') {
+        // Stack bottom-up: each segment's y is the remaining height above the segments
+        // already placed below it, so offset (running total from the bottom) subtracts
+        // from the full height rather than adding down from the top.
         const segHeight = share * height;
         const y = height - offset - segHeight;
         rect = `<rect x="0" y="${y}" width="${width}" height="${segHeight}" fill="${color}">${title}</rect>`;
@@ -142,7 +145,11 @@ function donut(segments, options) {
     .map((s) => {
       const value = Number(s.value) || 0;
       const share = value / total;
-      const endAngle = startAngle + share * 2 * Math.PI;
+      // Clamp just short of a full 2*PI sweep -- a segment holding the entire total would
+      // otherwise put the arc's start and end points at the exact same coordinate, which
+      // SVG renders as a zero-length (invisible) arc. The clamp is an imperceptible sliver
+      // at any real chart size but keeps the arc always visibly drawable.
+      const endAngle = Math.min(startAngle + share * 2 * Math.PI, startAngle + 2 * Math.PI - 0.0001);
       const largeArc = endAngle - startAngle > Math.PI ? 1 : 0;
       const outerStart = pointOnCircle(outerR, startAngle);
       const outerEnd = pointOnCircle(outerR, endAngle);
