@@ -120,6 +120,25 @@
       background: var(--bg);
       border-color: var(--border);
     }
+
+    .trend-strip {
+      margin-bottom: 1.5rem;
+    }
+
+    .trend-strip .label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .trend-strip svg {
+      display: block;
+      width: 100%;
+      height: 70px;
+    }
   </style>
 </head>
 <body>
@@ -148,8 +167,11 @@
         <div class="value" id="remaining">$0.00</div>
       </div>
     </div>
+
+    <div id="trend-strip-mount"></div>
   </div>
 
+  <script src="chart.js"></script>
   <script>
     const STORAGE_KEY = 'budget-v1';
     const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -160,7 +182,7 @@
     });
 
     function defaultState() {
-      return { paydays: { p1: 1, p2: 15 }, goals: [], bills: [], categories: [], months: {}, currentMonthKey: null, summary: null };
+      return { paydays: { p1: 1, p2: 15 }, goals: [], bills: [], categories: [], months: {}, currentMonthKey: null, summary: null, history: {} };
     }
 
     // Read-only mirror of allocator.html's shared schema. index.html never calls
@@ -177,7 +199,8 @@
           categories: Array.isArray(parsed.categories) ? parsed.categories : [],
           months: parsed.months && typeof parsed.months === 'object' ? parsed.months : {},
           currentMonthKey: typeof parsed.currentMonthKey === 'string' ? parsed.currentMonthKey : null,
-          summary: parsed.summary && typeof parsed.summary === 'object' ? parsed.summary : null
+          summary: parsed.summary && typeof parsed.summary === 'object' ? parsed.summary : null,
+          history: parsed.history && typeof parsed.history === 'object' ? parsed.history : {}
         };
       } catch {
         return defaultState();
@@ -244,9 +267,52 @@
       remainingCard.classList.add(awaitingIncome ? 'awaiting' : (summary.remaining >= 0 ? 'positive' : 'negative'));
     }
 
+    const TREND_STRIP_MAX_MONTHS = 6;
+
+    function renderTrendStrip() {
+      const mount = document.getElementById('trend-strip-mount');
+      const history = state.history || {};
+      // Guard against a missing/malformed entry, matching renderSummary()'s existing
+      // defensive convention for corrupted persisted data.
+      const monthKeys = Object.keys(history)
+        .filter((mk) => history[mk] && typeof history[mk] === 'object' && typeof history[mk].status === 'string')
+        .sort()
+        .slice(-TREND_STRIP_MAX_MONTHS);
+
+      if (monthKeys.length === 0) {
+        mount.innerHTML = '';
+        return;
+      }
+
+      const styles = getComputedStyle(document.documentElement);
+      const colorPositive = styles.getPropertyValue('--positive').trim();
+      const colorNegative = styles.getPropertyValue('--negative').trim();
+      const colorNeutral = styles.getPropertyValue('--text-muted').trim();
+
+      const points = monthKeys.map((mk) => {
+        const entry = history[mk];
+        const monthLabel = getMonthLabel(mk);
+        if (entry.status === 'awaiting' || typeof entry.remaining !== 'number') {
+          return { value: null, color: colorNeutral, label: `${monthLabel}: Awaiting income` };
+        }
+        return {
+          value: entry.remaining,
+          color: entry.remaining >= 0 ? colorPositive : colorNegative,
+          label: `${monthLabel}: ${currency.format(entry.remaining)}`
+        };
+      });
+
+      const monthWord = monthKeys.length === 1 ? 'month' : 'months';
+      const ariaLabel = `Remaining, last ${monthKeys.length} ${monthWord}`;
+      const svg = sparkline(points, { width: 600, height: 70, pointRadius: 4, ariaLabel });
+
+      mount.innerHTML = `<div class="trend-strip"><div class="label">Remaining, last ${monthKeys.length} ${monthWord}</div>${svg}</div>`;
+    }
+
     function render() {
       renderHeader();
       renderSummary();
+      renderTrendStrip();
     }
 
     function exportData() {
