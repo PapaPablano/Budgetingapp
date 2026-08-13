@@ -408,7 +408,8 @@
         categories: [],
         months: {},
         currentMonthKey: null,
-        summary: null
+        summary: null,
+        history: {}
       };
     }
 
@@ -442,7 +443,8 @@
           categories: Array.isArray(parsed.categories) ? parsed.categories : [],
           months,
           currentMonthKey: typeof parsed.currentMonthKey === 'string' ? parsed.currentMonthKey : null,
-          summary: parsed.summary && typeof parsed.summary === 'object' ? parsed.summary : null
+          summary: parsed.summary && typeof parsed.summary === 'object' ? parsed.summary : null,
+          history: parsed.history && typeof parsed.history === 'object' ? parsed.history : {}
         };
       } catch (e) {
         return defaultState();
@@ -472,7 +474,28 @@
 
     function persist() {
       state.summary = computeMonthSummary(monthKey);
+      // Only the real current calendar month's history entry updates live -- persist() also
+      // runs on mere navigation (prev/next-month handlers), not just edits, so gating on
+      // monthKeyOf(new Date()) rather than on monthKey itself is what keeps browsing to a
+      // past month from silently overwriting its already-frozen figure with today's bill data.
+      if (monthKey === monthKeyOf(new Date())) {
+        state.history[monthKey] = state.summary;
+      }
       saveState(state);
+    }
+
+    // One-time-per-month backfill: fills in a best-effort snapshot (from today's bill/goal
+    // definitions) for any month that has never had a live history write. Never overwrites an
+    // existing entry, so it's safe to run unconditionally on every load.
+    function backfillHistory() {
+      let added = false;
+      Object.keys(state.months).forEach((mk) => {
+        if (!state.history[mk]) {
+          state.history[mk] = computeMonthSummary(mk);
+          added = true;
+        }
+      });
+      if (added) saveState(state);
     }
 
     /* ---------------------------------------------------------------
@@ -651,6 +674,7 @@
     /* ---------------------------------------------------------------
        View state
     ---------------------------------------------------------------- */
+    backfillHistory();
     let monthKey = state.currentMonthKey || monthKeyOf(new Date());
     if (!state.currentMonthKey) {
       state.currentMonthKey = monthKey;
